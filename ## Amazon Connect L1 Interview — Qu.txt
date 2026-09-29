@@ -1,0 +1,486 @@
+## Amazon Connect L1 Interview — Questions & Answers
+
+Below are **all the questions you asked in this interview**, with the conversational answers we prepared. I’ve kept the answers aligned to **Shindhiya’s healthcare/Aetna Amazon Connect experience** and avoided adding unsupported claims where the resume doesn't establish them. 
+
+---
+
+### 1. Tell me about yourself
+
+> “Sure. I have around 4.6 years of experience in AWS and Cloud engineering, and my recent experience has been mainly focused on Amazon Connect and healthcare contact-center solutions.
+>
+> In my current project, I work on Amazon Connect contact flows and IVR development for healthcare customers. I have worked on inbound voice and chat interactions, including self-service IVR, queue routing, agent whisper flows, call disposition, and multi-language routing.
+>
+> I have hands-on experience with Connect blocks like Get Customer Input, Set Contact Attributes, Set Working Queue, Play Prompt, and Invoke AWS Lambda. We integrated Amazon Connect with Lambda to retrieve real-time customer information such as account status, plan details, and outstanding dues from backend APIs.
+>
+> I have also worked with Amazon Lex for natural-language self-service. On the monitoring and support side, I use Amazon Connect real-time metrics, CTR, CloudWatch and Splunk.
+>
+> I have also worked on a multi-language IVR supporting English and Spanish.
+>
+> Along with Amazon Connect, I have AWS and DevOps experience with EC2, S3, RDS, Lambda, VPC, CloudFront, Route 53, Auto Scaling, ELB, CloudWatch and Terraform.
+>
+> Overall, my strength is Amazon Connect development, AWS integration and production troubleshooting.”
+
+ 
+
+---
+
+### 2. What did you do in Amazon Connect?
+
+> “In Amazon Connect, I mainly worked on contact flows and IVR development for the healthcare project. I configured queues, routing profiles, hours of operation and agent whisper flows, and integrated Lambda to fetch real-time customer information such as plan details and account status.
+>
+> I also worked with Amazon Lex for self-service and used CTR, real-time metrics, CloudWatch and Splunk for monitoring and troubleshooting production issues.”
+
+
+
+---
+
+### 3. How do you troubleshoot issues in Amazon Connect?
+
+> “Usually, when I troubleshoot an Amazon Connect issue, I start with an actual affected contact. I take the contact ID and timestamp and first check the contact flow path to understand where the customer interaction failed.
+>
+> For example, if a healthcare customer says they entered their member ID but didn't receive their plan information, I check the Get Customer Input and Set Contact Attributes blocks to make sure the input was captured correctly. Then I check the Invoke Lambda block to see whether Lambda was successfully called.
+>
+> If Lambda is involved, I go to CloudWatch Logs and check the logs around the same timestamp. I look for timeout errors, exceptions, API failures or permission issues.
+>
+> I also check the CTR to understand what happened to that particular contact, and if required I correlate it with Splunk.
+>
+> If it's a routing issue, I check the queue, routing profile and contact attributes used for routing.
+>
+> Once I identify the root cause, I fix it in the lower environment, test the complete customer journey and then follow the change and deployment process for production.”
+
+
+
+---
+
+### 4. Why do you use API Gateway with Connect?
+
+> “In our healthcare Amazon Connect use case, API Gateway can be used as the secure entry point for backend APIs when Amazon Connect needs to retrieve or submit customer information.
+>
+> For example, when a member enters their member ID in the IVR, the Connect flow invokes Lambda. Lambda can then call the API layer, which routes the request to the appropriate backend service. The backend returns information such as plan details or account status, and Lambda sends the required response back to Amazon Connect.
+>
+> So the flow is basically:
+>
+> **Amazon Connect → Lambda → API Gateway/API layer → Backend → Lambda → Amazon Connect**
+>
+> API Gateway provides a managed API layer where we can implement authentication, authorization, request validation, throttling and monitoring.
+>
+> If there is an issue, I would check the Connect flow first, then Lambda CloudWatch logs, and then the API layer to determine where the request is failing.”
+
+**Important:** Your resume confirms **Connect → Lambda → backend API** integration, but does not explicitly name API Gateway for that project. 
+
+---
+
+### 5. How do you secure authentication in this flow?
+
+> “We keep authentication as a separate step before allowing access to sensitive healthcare information.
+>
+> For example, when a member calls the Amazon Connect number, the IVR can ask for a member ID and another verification factor according to the business requirement. The information is passed securely to the backend through Lambda.
+>
+> Lambda validates the request with the backend authentication service. If authentication is successful, we continue the flow and provide the required information. If authentication fails, we don't expose member information and can either provide another attempt or transfer the customer to an agent.
+>
+> From the AWS side, we follow least-privilege IAM permissions, and sensitive customer information should not be written directly into CloudWatch logs. We mask or avoid sensitive values in logs.
+>
+> So the basic flow is:
+>
+> **Customer → Connect IVR → Authentication → Lambda → Secure API → Backend → Response → Connect.**”
+
+---
+
+### 6. API is returning 500 for many requests. Calls should not disconnect. What happens and how do you troubleshoot?
+
+> “If the backend API starts returning 500 errors for many requests, my first priority is to make sure the customer call doesn't disconnect.
+>
+> I would design the contact flow with an error or fallback branch around the Lambda integration.
+>
+> For example, if a healthcare member calls and the IVR invokes Lambda to retrieve plan information, Lambda should handle the API failure properly instead of allowing an unhandled exception to terminate the flow.
+>
+> Lambda can return a controlled failure response to Connect. The flow can then play a message such as, ‘We're currently unable to retrieve your information. Please hold while we connect you to an agent,’ and transfer the customer to the appropriate queue.
+>
+> The flow becomes:
+>
+> **Connect → Lambda → API → 500 → Lambda handles error → Connect fallback → Queue → Agent**
+>
+> For troubleshooting, I would take an affected contact ID and timestamp, check the Lambda CloudWatch logs, confirm the 500 response, and check response time, exceptions and downstream failures.
+>
+> If an API gateway layer is involved, I would check its metrics and logs for increased 5XX errors, latency or throttling.
+>
+> I would also monitor Connect real-time metrics because a backend failure can cause more customers to be transferred to agents, resulting in a sudden queue increase.
+>
+> The key point is that an API failure should be handled gracefully rather than allowing it to disconnect the customer.”
+
+---
+
+### 7. DynamoDB has lots of product/service mappings. How exactly do you connect the IVR to the queue?
+
+> “I would keep the product-to-service mapping in DynamoDB and use Lambda to make the routing decision.
+>
+> For example, suppose the customer selects Product A in the IVR. The Connect flow captures that selection as a contact attribute and passes it to Lambda.
+>
+> Lambda queries DynamoDB and gets the corresponding service and queue mapping.
+>
+> For example:
+>
+> **Product A → Technical Support → Technical Support Queue**
+>
+> Lambda returns the required routing information to Amazon Connect. The flow stores it as a contact attribute and then uses the appropriate Set Working Queue logic to route the customer.
+>
+> So the flow is:
+>
+> **Customer → Connect IVR → Product selection → Contact Attribute → Lambda → DynamoDB → Queue mapping → Set Working Queue → Queue → Agent**
+>
+> If there are hundreds of products, I wouldn't hard-code hundreds of conditions into the contact flow. I'd keep the mapping in DynamoDB and make Lambda reusable.
+>
+> For troubleshooting, I'd check the contact attributes, Lambda CloudWatch logs, DynamoDB response, Set Working Queue configuration and routing profile. Finally, I'd use CTR to verify the actual queue to which the contact was routed.”
+
+---
+
+### 8. What are Amazon Connect Security Profiles and IAM?
+
+> “Security Profiles and IAM are two different layers of access control.
+>
+> An Amazon Connect Security Profile controls what a user can do inside the Amazon Connect instance. For example, an agent may have permission to handle contacts, while a supervisor may have additional reporting or management permissions.
+>
+> IAM controls access to AWS resources and APIs.
+>
+> For example, if Lambda needs to access DynamoDB, its IAM execution role can be given permission to access only the required DynamoDB table.
+>
+> So:
+>
+> **Security Profile → permissions inside Amazon Connect**
+>
+> **IAM → permissions to AWS services and resources**
+>
+> If an agent cannot perform something inside Connect, I would check the Security Profile. If Lambda cannot access DynamoDB or another AWS service, I would check the IAM role and policy.
+>
+> In both cases, I follow least privilege.”
+
+---
+
+### 9. How do you manage data in transit and at rest?
+
+> “For data in transit, whenever information moves between Connect, Lambda, API services and backend systems, we use secure communication such as HTTPS/TLS.
+>
+> For example, when a healthcare member provides their member ID and Lambda communicates with the backend to retrieve plan information, the communication should be encrypted in transit.
+>
+> For data at rest, data stored in services such as S3, DynamoDB or databases should be encrypted using the appropriate AWS encryption mechanisms, with KMS where required.
+>
+> We also control access using IAM and resource policies.
+>
+> Another important part is logging. We should not put sensitive healthcare or member information directly into CloudWatch or application logs. Sensitive values should be masked or excluded.
+>
+> So:
+>
+> **In transit → TLS/HTTPS**
+>
+> **At rest → encryption + KMS where required + access control**
+>
+> And on top of that, we use least-privilege permissions and controlled logging.”
+
+---
+
+### 10. How do you promote an Amazon Connect contact-flow change from Dev → Test → Prod without manually recreating it?
+
+> “In our project, we maintained the Amazon Connect contact-flow definition as JSON and version-controlled it.
+>
+> If I make a change in Dev, for example changing the healthcare IVR routing logic, I test the complete call journey first.
+>
+> Then I export the contact-flow definition as JSON, commit it to Git and raise a pull request.
+>
+> After review and approval, the CI/CD pipeline deploys the approved version to Test. We perform functional testing there—for example member input, Lambda integration, prompts and queue routing.
+>
+> After UAT approval, the same approved version is promoted to Production through the pipeline.
+>
+> So the process is:
+>
+> **Dev → JSON → Git → CI/CD → Test → UAT → Production**
+>
+> This avoids manually recreating the flow and gives us version control and traceability.
+>
+> If there's a production issue, we can identify the previous approved version and use it as the rollback version.”
+
+Your resume explicitly supports JSON version control and controlled deployment across dev, staging and production. 
+
+---
+
+### 11. How do you authenticate GitHub to AWS?
+
+> “For GitHub to AWS, I would use GitHub OIDC.
+>
+> In AWS IAM, I configure the GitHub OIDC identity provider and create a dedicated IAM deployment role.
+>
+> In the role's trust policy, I restrict access to our specific GitHub repository and approved branch.
+>
+> In GitHub Actions, I give the workflow permission to request an OIDC token and configure the AWS credentials action with the IAM role ARN.
+>
+> When the workflow runs, GitHub generates an OIDC token. AWS validates that token against the role's trust policy and provides temporary AWS credentials.
+>
+> So the flow is:
+>
+> **GitHub → OIDC → IAM Role → Temporary Credentials → AWS**
+>
+> We don't need to store permanent AWS access keys in the repository.”
+
+---
+
+### 12. Where do you configure GitHub OIDC in AWS?
+
+> “I configure it in the AWS IAM service.
+>
+> I go to:
+>
+> **AWS Console → IAM → Identity providers → Add provider**
+>
+> and configure the GitHub OIDC provider.
+>
+> Then I go to:
+>
+> **IAM → Roles → Create Role**
+>
+> I configure the trust relationship to allow the GitHub OIDC provider to assume the role and restrict it to the required repository and branch.
+>
+> Then I attach the required least-privilege permissions to the role.
+>
+> So the main AWS configuration is under **IAM → Identity Providers and IAM → Roles**.”
+
+---
+
+### 13. How do you restrict a particular GitHub repository to an IAM role?
+
+> “I restrict it through the **IAM role's trust policy**.
+>
+> For example, suppose the repository is:
+>
+> `mycompany/amazon-connect-project`
+>
+> In the role's trust relationship, I restrict the GitHub OIDC subject to that repository and branch.
+>
+> Conceptually:
+>
+> `repo:mycompany/amazon-connect-project:ref:refs/heads/main`
+>
+> I can also validate the OIDC audience as `sts.amazonaws.com`.
+>
+> This means another repository cannot assume that role unless it matches the trust-policy conditions.
+>
+> For production, I would normally have separate roles for Dev, Test and Prod and restrict each role appropriately.”
+
+---
+
+### 14. How do you call the IAM role from GitHub?
+
+> “I call the AWS IAM role from the GitHub Actions workflow using the AWS credentials action.
+>
+> The important part of the workflow is:
+>
+> ```yaml
+> permissions:
+>   id-token: write
+>   contents: read
+>
+> steps:
+>   - uses: actions/checkout@v4
+>
+>   - name: Configure AWS credentials
+>     uses: aws-actions/configure-aws-credentials@v4
+>     with:
+>       role-to-assume: arn:aws:iam::<account-id>:role/GitHub-Connect-Deploy-Role
+>       aws-region: ap-south-1
+> ```
+>
+> The `role-to-assume` contains the ARN of the IAM role.
+>
+> GitHub generates the OIDC token, AWS validates the trust policy and the workflow receives temporary credentials.
+>
+> I can also use `aws sts get-caller-identity` in the workflow to verify which role is being used.”
+
+---
+
+### 15. Your code is in GitHub. How do you deploy it to AWS?
+
+> “The code and Amazon Connect contact-flow definitions are maintained in GitHub. I use CI/CD rather than manually copying the changes into AWS.
+>
+> For example, if I change a healthcare IVR, I export the flow definition as JSON, commit it to GitHub and raise a pull request.
+>
+> Once the change is reviewed and merged, GitHub Actions triggers the pipeline.
+>
+> The pipeline checks out the code, validates it, authenticates to AWS using GitHub OIDC and the IAM deployment role, and then runs the deployment automation against the target Amazon Connect environment.
+>
+> For multiple environments, the process is:
+>
+> **GitHub → CI/CD → AWS authentication → Dev → Test/UAT → Production**
+>
+> This gives us version control, traceability and controlled promotion between environments.”
+
+---
+
+### 16. How do you configure GitHub Actions?
+
+> “I configure GitHub Actions inside the GitHub repository under:
+>
+> **`.github/workflows/`**
+>
+> For example, I create a `deploy.yml` workflow.
+>
+> In that YAML I define the trigger, jobs and deployment steps.
+>
+> The basic flow is:
+>
+> **Checkout → AWS authentication → Validation → Deployment**
+>
+> For AWS authentication, I configure OIDC and specify the IAM role ARN.
+>
+> For example:
+>
+> ```yaml
+> permissions:
+>   id-token: write
+>   contents: read
+> ```
+>
+> Then I use the AWS credentials action to assume the IAM role.
+>
+> After authentication, the workflow executes the deployment script or AWS CLI commands to deploy the approved Amazon Connect contact-flow definition.”
+
+---
+
+### 17. How do you leverage Splunk?
+
+> “In my healthcare Amazon Connect project, I mainly used Splunk for monitoring, KPI analysis and production troubleshooting.
+>
+> For example, if operations reported that customers were experiencing longer wait times or incorrect routing, I would start with the contact ID and timestamp.
+>
+> In Splunk, I would search the relevant CTR information and correlate it with Lambda or application logs around the same timestamp.
+>
+> I used dashboards to monitor things such as queue performance, abandonment rate and Average Handle Time.
+>
+> If I noticed an abnormal increase, I would drill down into the events and determine whether the issue was related to the contact flow, routing, Lambda or backend processing.
+>
+> For example, if a healthcare member's plan information wasn't retrieved, I could trace the interaction, correlate the CTR with Lambda logs and determine whether there was a timeout, API failure or unexpected response.
+>
+> So I used Splunk mainly to **correlate contact-center activity with application logs and speed up production root-cause analysis**.”
+
+Your resume explicitly states this Splunk/CTR/Lambda monitoring and RCA responsibility. 
+
+---
+
+### 18. How do you migrate an existing helpline number to an Amazon Connect number?
+
+> “I would treat that as a **number-porting activity** rather than simply creating a new number.
+>
+> First, I would raise the appropriate AWS porting request and provide the existing phone number and required carrier information.
+>
+> AWS validates the number and provides the required porting process and documentation.
+>
+> Before the port date, I would make sure the Amazon Connect instance and target contact flow are already configured and tested.
+>
+> Once the number is ported to Connect, I would associate it with the required healthcare IVR flow and perform test calls.
+>
+> I would verify the complete journey:
+>
+> **Phone number → Connect → IVR → Lambda if required → Queue → Agent**
+>
+> I would also monitor the system during cutover and confirm that calls are reaching the correct flow and agents.”
+
+---
+
+### 19. Lambda and API are healthy, callers reach the queue, but agents aren't receiving calls. How do you troubleshoot?
+
+> “Since Lambda and the API are healthy and the customer is successfully reaching the queue, I would focus on the **queue-to-agent routing path**.
+>
+> First, I would check Amazon Connect real-time metrics to see the number of contacts waiting in the queue and the number of available agents.
+>
+> Then I would check the agents' **routing profiles**. I would verify that the correct queue is associated with the agents and that the routing configuration is correct.
+>
+> I would also check the agent status and make sure the agents are actually available for the required channel.
+>
+> Then I would check the contact flow's queue configuration and make sure the correct queue was selected.
+>
+> I would take an actual contact ID and check the CTR to understand whether the contact remained queued, was offered to an agent, or was otherwise affected.
+>
+> For example, if I have ten contacts in a queue and five agents appear available, but none receives a call, I would first verify whether those five agents' routing profiles actually include that queue.
+>
+> So my troubleshooting path is:
+>
+> **Real-time metrics → Queue → Routing Profile → Agent status/channel → Contact Flow → CTR → Recent configuration changes.**”
+
+Your resume supports real-time Connect metrics and queue/routing configuration work. 
+
+---
+
+### 20. Tell me about the telephony you managed.
+
+> “In my Amazon Connect project, I mainly managed the inbound voice side of the contact center.
+>
+> I worked with Amazon Connect phone numbers, contact flows, IVR, queues and routing configuration.
+>
+> For example, when a healthcare member calls, the number reaches the Amazon Connect instance, the contact flow handles the IVR, collects the required input, invokes Lambda when backend information is required, and then routes the caller to the appropriate queue.
+>
+> I also worked with Hours of Operation, routing profiles and agent configuration.
+>
+> From the support side, I monitored real-time contact metrics and investigated issues such as incorrect routing, calls not reaching agents and audio-related issues.
+>
+> So my telephony experience is mainly around **inbound voice, IVR/contact flows, number-to-flow routing, queues, agent routing and troubleshooting**.”
+
+
+
+---
+
+### 21. How long can Lambda run?
+
+> “The maximum execution time for a single AWS Lambda invocation is **15 minutes**.
+>
+> But in my Amazon Connect use case, I wouldn't design the Lambda to run anywhere close to 15 minutes. It's mainly used for retrieving healthcare customer information from backend APIs, so I would keep the execution short and configure the timeout appropriately.
+>
+> If the backend is taking too long, I would investigate the API latency and Lambda CloudWatch logs rather than allowing the Connect interaction to wait for a long period.”
+
+---
+
+### 22. What happens if Lambda takes 20 minutes?
+
+> “Lambda cannot run for 20 minutes as a single invocation because the maximum timeout is 15 minutes.
+>
+> If the execution reaches 15 minutes, Lambda terminates that invocation and it results in a timeout/failure.
+>
+> If this happened in our healthcare integration, I would check CloudWatch Logs to determine why the processing is taking so long.
+>
+> If the operation genuinely needs more than 15 minutes, I would redesign it as an asynchronous process using services such as SQS, Step Functions or ECS depending on the requirement.
+>
+> For Amazon Connect specifically, I wouldn't keep the customer waiting for that long. I would return a quick response or use a fallback path and, where appropriate, route the customer to an agent.”
+
+---
+
+### 23. What do you do if an AWS Region goes down?
+
+> “For a critical healthcare contact-center application, I would first confirm whether it's actually a regional outage or an issue with our own Connect flow, Lambda, API or networking.
+>
+> For a system designed with disaster recovery, I would follow the documented DR runbook and move traffic to the prepared secondary environment according to the architecture.
+>
+> I would verify that the secondary Connect environment and dependent services are healthy, then test an actual customer call end-to-end:
+>
+> **Phone → IVR → Lambda/API → Queue → Agent**
+>
+> I would monitor real-time metrics, CloudWatch and CTRs after the failover.
+>
+> Once the primary Region is recovered, I wouldn't immediately switch back. I would validate it first and perform a controlled failback after approval.
+>
+> My resume doesn't specifically document that I personally performed a production Amazon Connect multi-Region failover, so I would describe this as the DR approach rather than claim a hands-on regional failover that I haven't performed.”
+
+---
+
+### 24. How do you authenticate Jenkins to AWS?
+
+> “If Jenkins is running on an EC2 instance, my preferred approach is to attach an **IAM role or instance profile** to the EC2 instance.
+>
+> Jenkins can then obtain temporary AWS credentials through the instance role instead of storing permanent AWS access keys.
+>
+> The flow is:
+>
+> **Jenkins → EC2 IAM Role → Temporary Credentials → AWS**
+>
+> The IAM role should have only the permissions required for the deployment.
+>
+> If Jenkins is outside AWS, we can use securely managed credentials or an appropriate federation/role-assumption mechanism based on the organization's security standard.
+>
+> I avoid hardcoding AWS access keys in the Jenkinsfile.”
+
+
